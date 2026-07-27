@@ -114,6 +114,8 @@ export default function Page() {
 }
 ```
 
+`@openai-oauth/react` also exports `SignInWithGemini`, `SignInWithDeepSeek`, `useSignInWithGemini`, and `useSignInWithDeepSeek` for multi-provider sign-in flows.
+
 ```ts
 // app/api/chat/route.ts
 import { createOpenAIOAuth } from "@openai-oauth/ai-sdk";

@@ -54,6 +54,7 @@ export type SessionStore = {
 export type OpenAIOAuthRequestOptions = {
 	clientId?: string
 	issuer?: string
+	authorizationUrl?: string
 	redirectUri: string
 	scope?: string
 	state?: string
@@ -377,7 +378,9 @@ export const createOpenAIOAuthRequest = async (
 	const issuer = trimTrailingSlash(
 		options.issuer ?? DEFAULT_OPENAI_OAUTH_ISSUER,
 	)
-	const authorizationUrl = new URL(`${issuer}/oauth/authorize`)
+	const authorizationUrl = new URL(
+		options.authorizationUrl ?? `${issuer}/oauth/authorize`,
+	)
 
 	authorizationUrl.searchParams.set("response_type", "code")
 	authorizationUrl.searchParams.set(

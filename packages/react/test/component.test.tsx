@@ -2,7 +2,7 @@
 import { act } from "react"
 import { createRoot } from "react-dom/client"
 import { describe, expect, test, vi } from "vitest"
-import { SignInWithChatGPT } from "../src/index.js"
+import { SignInWithChatGPT, SignInWithGemini } from "../src/index.js"
 
 describe("SignInWithChatGPT", () => {
 	test("loads a stored session and disconnects it", async () => {
@@ -56,6 +56,28 @@ describe("SignInWithChatGPT", () => {
 		expect(onError).toHaveBeenCalledWith(
 			expect.objectContaining({ code: "request-failed" }),
 		)
+		await act(async () => root.unmount())
+	})
+
+	test("renders provider-specific labels", async () => {
+		vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true)
+		const container = document.createElement("div")
+		const root = createRoot(container)
+
+		await act(async () => {
+			root.render(
+				<SignInWithGemini
+					hideAttribution
+					sessionStore={{
+						get: async () => null,
+						set: async () => undefined,
+						clear: async () => undefined,
+					}}
+				/>,
+			)
+		})
+
+		expect(container.textContent).toContain("Sign in with Gemini")
 		await act(async () => root.unmount())
 	})
 })

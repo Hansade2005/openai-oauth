@@ -16,9 +16,48 @@ import type {
 } from "./types.js"
 
 export type SignInWithChatGPTOpenMode = "redirect" | "popup"
+export type AuthProvider = "chatgpt" | "gemini" | "deepseek"
+export type AuthPlatform = "web" | "mobile" | "desktop"
+
+type ProviderDefaults = {
+	clientId?: string
+	issuer?: string
+	authorizationUrl?: string
+	tokenUrl?: string
+	scope?: string
+	extraParams?: Record<string, string | number | boolean | undefined>
+	idTokenAddOrganizations?: boolean
+	simplifiedFlow?: boolean
+}
+
+const providerDefaults: Record<AuthProvider, ProviderDefaults> = {
+	chatgpt: {},
+	gemini: {
+		issuer: "https://accounts.google.com",
+		authorizationUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+		tokenUrl: "https://oauth2.googleapis.com/token",
+		scope: "openid profile email",
+		extraParams: {
+			access_type: "offline",
+			prompt: "consent",
+		},
+		idTokenAddOrganizations: false,
+		simplifiedFlow: false,
+	},
+	deepseek: {
+		issuer: "https://platform.deepseek.com",
+		authorizationUrl: "https://platform.deepseek.com/oauth/authorize",
+		tokenUrl: "https://platform.deepseek.com/oauth/token",
+		scope: "openid profile email offline_access",
+		idTokenAddOrganizations: false,
+		simplifiedFlow: false,
+	},
+}
 
 export type UseSignInWithChatGPTOptions = Omit<StartLoginOptions, "returnTo"> &
 	Pick<CompleteLoginOptions, "fetch" | "now" | "tokenUrl"> & {
+		provider?: AuthProvider
+		platform?: AuthPlatform
 		sessionStore?: SessionStore
 		onStateChange?: (state: SignInWithChatGPTState) => void
 		onSuccess?: (session: OpenAIOAuthSession) => void
@@ -61,10 +100,19 @@ const toLoginError = (
 	code: SignInWithChatGPTError["code"] = "request-failed",
 ): SignInWithChatGPTError => ({
 	code,
-	message:
-		error instanceof Error ? error.message : "Sign in with ChatGPT failed.",
+	message: error instanceof Error ? error.message : "Sign in failed.",
 	cause: error,
 })
+
+const getDefaultRedirectUri = (callbackPath?: string): string | undefined => {
+	if (typeof window === "undefined") {
+		return undefined
+	}
+	return new URL(
+		callbackPath ?? "/auth/callback",
+		window.location.origin,
+	).toString()
+}
 
 const notifyOpener = (): void => {
 	if (window.opener && window.opener !== window) {
@@ -86,8 +134,11 @@ export const useSignInWithChatGPT = (
 	options: UseSignInWithChatGPTOptions = {},
 ): UseSignInWithChatGPTReturn => {
 	const {
+		provider = "chatgpt",
+		platform = "web",
 		callbackPath,
 		clientId,
+		authorizationUrl,
 		codeVerifier,
 		sessionStore: providedSessionStore,
 		extraParams,
@@ -110,6 +161,28 @@ export const useSignInWithChatGPT = (
 	const onStateChangeRef = useLatest(onStateChange)
 	const defaultStore = useMemo(() => createSessionStore(), [])
 	const sessionStore = providedSessionStore ?? defaultStore
+	const providerConfig = useMemo(() => providerDefaults[provider], [provider])
+	const resolvedClientId = clientId ?? providerConfig.clientId
+	const resolvedIssuer = issuer ?? providerConfig.issuer
+	const resolvedTokenUrl = tokenUrl ?? providerConfig.tokenUrl
+	const resolvedAuthorizationUrl =
+		authorizationUrl ?? providerConfig.authorizationUrl
+	const resolvedScope = scope ?? providerConfig.scope
+	const resolvedIdTokenAddOrganizations =
+		idTokenAddOrganizations ?? providerConfig.idTokenAddOrganizations
+	const resolvedSimplifiedFlow = simplifiedFlow ?? providerConfig.simplifiedFlow
+	const resolvedExtraParams =
+		extraParams || providerConfig.extraParams
+			? {
+					...(providerConfig.extraParams ?? {}),
+					...(extraParams ?? {}),
+				}
+			: undefined
+	const resolvedOpenMode =
+		openMode ?? (platform === "desktop" ? "popup" : "redirect")
+	const resolvedRedirectUri =
+		redirectUri ??
+		(provider === "chatgpt" ? undefined : getDefaultRedirectUri(callbackPath))
 	const [state, setState] = useState<SignInWithChatGPTState>(checkingState)
 
 	const signedInState = useCallback(
@@ -159,12 +232,12 @@ export const useSignInWithChatGPT = (
 		}
 
 		const session = await completeLogin({
-			clientId,
+			clientId: resolvedClientId,
 			fetch: fetchImpl,
-			issuer,
+			issuer: resolvedIssuer,
 			now,
 			sessionStore,
-			tokenUrl,
+			tokenUrl: resolvedTokenUrl,
 		})
 		if (!session) {
 			return false
@@ -176,12 +249,12 @@ export const useSignInWithChatGPT = (
 		notifyOpener()
 		return true
 	}, [
-		clientId,
+		resolvedClientId,
 		fetchImpl,
-		issuer,
+		resolvedIssuer,
 		now,
 		sessionStore,
-		tokenUrl,
+		resolvedTokenUrl,
 		onSuccessRef,
 		setLoginState,
 		signedInState,
@@ -244,7 +317,7 @@ export const useSignInWithChatGPT = (
 
 	const login = useCallback(async () => {
 		if (!isBrowser()) {
-			fail(new Error("Sign in with ChatGPT can only start in a browser."))
+			fail(new Error("Sign-in can only start in a browser."))
 			return
 		}
 
@@ -259,15 +332,16 @@ export const useSignInWithChatGPT = (
 
 			const result = await startLogin({
 				callbackPath,
-				clientId,
+				clientId: resolvedClientId,
+				authorizationUrl: resolvedAuthorizationUrl,
 				codeVerifier,
-				extraParams,
-				idTokenAddOrganizations,
-				issuer,
-				openMode,
-				redirectUri,
-				scope,
-				simplifiedFlow,
+				extraParams: resolvedExtraParams,
+				idTokenAddOrganizations: resolvedIdTokenAddOrganizations,
+				issuer: resolvedIssuer,
+				openMode: resolvedOpenMode,
+				redirectUri: resolvedRedirectUri,
+				scope: resolvedScope,
+				simplifiedFlow: resolvedSimplifiedFlow,
 				state: configuredState,
 			})
 			if (result.status === "needs-extension") {
@@ -291,18 +365,19 @@ export const useSignInWithChatGPT = (
 		}
 	}, [
 		callbackPath,
-		clientId,
+		resolvedClientId,
+		resolvedAuthorizationUrl,
 		codeVerifier,
 		configuredState,
-		extraParams,
+		resolvedExtraParams,
 		fail,
-		idTokenAddOrganizations,
-		issuer,
-		openMode,
-		redirectUri,
-		scope,
+		resolvedIdTokenAddOrganizations,
+		resolvedIssuer,
+		resolvedOpenMode,
+		resolvedRedirectUri,
+		resolvedScope,
 		setLoginState,
-		simplifiedFlow,
+		resolvedSimplifiedFlow,
 		state.status,
 	])
 
@@ -323,11 +398,11 @@ export const useSignInWithChatGPT = (
 					refreshToken: session.refreshToken,
 				},
 				{
-					clientId,
+					clientId: resolvedClientId,
 					fetch: fetchImpl,
-					issuer,
+					issuer: resolvedIssuer,
 					now,
-					tokenUrl,
+					tokenUrl: resolvedTokenUrl,
 				},
 			)
 			const nextSession =
@@ -344,17 +419,17 @@ export const useSignInWithChatGPT = (
 			return null
 		}
 	}, [
-		clientId,
+		resolvedClientId,
 		fail,
 		fetchImpl,
-		issuer,
+		resolvedIssuer,
 		now,
 		onSuccessRef,
 		sessionStore,
 		setLoginState,
 		signedInState,
 		state.session,
-		tokenUrl,
+		resolvedTokenUrl,
 	])
 
 	const reset = useCallback(async () => {
@@ -371,3 +446,18 @@ export const useSignInWithChatGPT = (
 		reset,
 	}
 }
+
+export type UseSignInWithProviderOptions = Omit<
+	UseSignInWithChatGPTOptions,
+	"provider"
+>
+
+export const useSignInWithGemini = (
+	options: UseSignInWithProviderOptions = {},
+): UseSignInWithChatGPTReturn =>
+	useSignInWithChatGPT({ ...options, provider: "gemini" })
+
+export const useSignInWithDeepSeek = (
+	options: UseSignInWithProviderOptions = {},
+): UseSignInWithChatGPTReturn =>
+	useSignInWithChatGPT({ ...options, provider: "deepseek" })

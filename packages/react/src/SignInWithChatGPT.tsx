@@ -7,6 +7,8 @@ import type {
 import { useState } from "react"
 import { SignInWithChatGPTExtensionScreen } from "./SignInWithChatGPTExtensionScreen.js"
 import {
+	type AuthPlatform,
+	type AuthProvider,
 	type UseSignInWithChatGPTOptions,
 	useSignInWithChatGPT,
 } from "./useSignInWithChatGPT.js"
@@ -16,6 +18,8 @@ export type SignInWithChatGPTProps = Omit<
 	"onError"
 > &
 	UseSignInWithChatGPTOptions & {
+		provider?: AuthProvider
+		platform?: AuthPlatform
 		loadingLabel?: string
 		redirectingLabel?: string
 		signedInLabel?: string
@@ -88,9 +92,41 @@ const OpenAILogo = () => (
 	</svg>
 )
 
+const providerLabels: Record<
+	AuthProvider,
+	{
+		defaultLabel: string
+		loadingLabel: string
+		redirectingLabel: string
+		signedInLabel: string
+	}
+> = {
+	chatgpt: {
+		defaultLabel: "Sign in with ChatGPT",
+		loadingLabel: "Connecting...",
+		redirectingLabel: "Signing in...",
+		signedInLabel: "Disconnect ChatGPT",
+	},
+	gemini: {
+		defaultLabel: "Sign in with Gemini",
+		loadingLabel: "Connecting...",
+		redirectingLabel: "Signing in...",
+		signedInLabel: "Disconnect Gemini",
+	},
+	deepseek: {
+		defaultLabel: "Sign in with DeepSeek",
+		loadingLabel: "Connecting...",
+		redirectingLabel: "Signing in...",
+		signedInLabel: "Disconnect DeepSeek",
+	},
+}
+
 export const SignInWithChatGPT = ({
+	provider = "chatgpt",
+	platform = "web",
 	callbackPath,
 	clientId,
+	authorizationUrl,
 	codeVerifier,
 	sessionStore,
 	extraParams,
@@ -107,13 +143,13 @@ export const SignInWithChatGPT = ({
 	simplifiedFlow,
 	state,
 	tokenUrl,
-	loadingLabel = "Connecting...",
-	redirectingLabel = "Signing in...",
-	signedInLabel = "Disconnect ChatGPT",
+	loadingLabel,
+	redirectingLabel,
+	signedInLabel,
 	hideAttribution = false,
 	hideWhenSignedIn = false,
 	showLogo = true,
-	children = "Sign in with ChatGPT",
+	children,
 	disabled,
 	onClick,
 	onMouseEnter,
@@ -123,9 +159,13 @@ export const SignInWithChatGPT = ({
 	...props
 }: SignInWithChatGPTProps) => {
 	const [isHovered, setIsHovered] = useState(false)
+	const labels = providerLabels[provider]
 	const login = useSignInWithChatGPT({
+		provider,
+		platform,
 		callbackPath,
 		clientId,
+		authorizationUrl,
 		codeVerifier,
 		sessionStore,
 		extraParams,
@@ -173,13 +213,14 @@ export const SignInWithChatGPT = ({
 		return null
 	}
 
-	const extensionScreen = needsExtension ? (
-		<SignInWithChatGPTExtensionScreen
-			installUrl={login.installUrl}
-			onCancel={login.reset}
-			onContinue={login.login}
-		/>
-	) : null
+	const extensionScreen =
+		needsExtension && provider === "chatgpt" ? (
+			<SignInWithChatGPTExtensionScreen
+				installUrl={login.installUrl}
+				onCancel={login.reset}
+				onContinue={login.login}
+			/>
+		) : null
 
 	const button = (
 		<button
@@ -198,12 +239,12 @@ export const SignInWithChatGPT = ({
 			{showLogo ? <OpenAILogo /> : null}
 			<span>
 				{login.status === "redirecting"
-					? redirectingLabel
+					? (redirectingLabel ?? labels.redirectingLabel)
 					: isBusy
-						? loadingLabel
+						? (loadingLabel ?? labels.loadingLabel)
 						: isSignedIn
-							? signedInLabel
-							: children}
+							? (signedInLabel ?? labels.signedInLabel)
+							: (children ?? labels.defaultLabel)}
 			</span>
 		</button>
 	)
@@ -232,3 +273,13 @@ export const SignInWithChatGPT = ({
 		</span>
 	)
 }
+
+export type SignInWithProviderProps = Omit<SignInWithChatGPTProps, "provider">
+
+export const SignInWithGemini = (props: SignInWithProviderProps) => (
+	<SignInWithChatGPT {...props} provider="gemini" />
+)
+
+export const SignInWithDeepSeek = (props: SignInWithProviderProps) => (
+	<SignInWithChatGPT {...props} provider="deepseek" />
+)

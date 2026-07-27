@@ -20,6 +20,14 @@ export default function Page() {
 }
 ```
 
+Multi-provider wrappers are also available:
+
+```tsx
+import { SignInWithDeepSeek, SignInWithGemini } from "@openai-oauth/react";
+```
+
+For providers other than ChatGPT, configure your own OAuth client/app settings (`clientId`, `redirectUri`, and provider-specific endpoints as needed).
+
 ## Package Notes
 
 `SignInWithChatGPT` renders the OpenAI-style sign-in button. After sign-in, it becomes a disconnect button.
@@ -146,7 +154,11 @@ type SessionStore = {
 Exports:
 
 - `SignInWithChatGPT`
+- `SignInWithGemini`
+- `SignInWithDeepSeek`
 - `useSignInWithChatGPT`
+- `useSignInWithGemini`
+- `useSignInWithDeepSeek`
 - `openaiAuthHeaders`
 - `getSession`
 - `createSessionStore`

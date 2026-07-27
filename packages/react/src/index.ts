@@ -10,6 +10,9 @@ export {
 export {
 	SignInWithChatGPT,
 	type SignInWithChatGPTProps,
+	SignInWithDeepSeek,
+	SignInWithGemini,
+	type SignInWithProviderProps,
 } from "./SignInWithChatGPT.js"
 export type {
 	OpenAIOAuthSession,
@@ -18,8 +21,13 @@ export type {
 	SignInWithChatGPTState,
 } from "./types.js"
 export {
+	type AuthPlatform,
+	type AuthProvider,
 	type SignInWithChatGPTOpenMode,
 	type UseSignInWithChatGPTOptions,
 	type UseSignInWithChatGPTReturn,
+	type UseSignInWithProviderOptions,
 	useSignInWithChatGPT,
+	useSignInWithDeepSeek,
+	useSignInWithGemini,
 } from "./useSignInWithChatGPT.js"
